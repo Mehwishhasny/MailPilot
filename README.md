@@ -1,4 +1,4 @@
-# MailPilot Pro — Account Signup + SQLite (Public Preview)
+# MailPilot Pro
 
 A Streamlit portfolio app with owner login, self-registration, account-isolated data, campaign design, interactive charts, and simulated reports. The **public edition never sends real emails** and never asks for SMTP credentials.
 
@@ -60,7 +60,6 @@ To keep SQLite for hosting, choose a web host with a **persistent mounted volume
 streamlit run app.py --server.address 0.0.0.0 --server.port $PORT
 ```
 
-For a free Streamlit Community Cloud deployment with permanently saved accounts, switch to a managed database such as PostgreSQL (for example, Supabase), rather than local SQLite. That would require an additional code/database integration.
 
 **Security checklist before a real public launch:** email ownership verification, password reset by verified email, signup abuse prevention/rate limiting, HTTPS, privacy notice and data deletion process, access monitoring, and encrypted backups. The current signup is an **MVP / local prototype**, not a fully audited production authentication service.
 
