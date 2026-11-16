@@ -265,7 +265,7 @@ if not _identity:
                     st.rerun()
                 except (SupabaseError,KeyError):
                     st.error('Unable to sign in. Check your credentials and verify your email first.')
-                      if st.button('Forgot Password?', key='forgot_password'):
+            if st.button('Forgot Password?', key='forgot_password'):
                 st.session_state['show_password_reset'] = True
 
             if st.session_state.get('show_password_reset', False):
