@@ -27,15 +27,6 @@ st.set_page_config(page_title='MailPilot Pro | Email Automation',page_icon="mail
 st.set_option('client.toolbarMode', 'viewer')
 # Registered users use Supabase PostgreSQL; only guest demo writes a temporary SQLite file.
 
-/* Hide Streamlit's top-right toolbar */
-[data-testid="stToolbar"] {
-    display: none !important;
-}
-
-[data-testid="stDecoration"] {
-    display: none !important;
-}
-
 st.markdown('''<style>
 /* MailPilot Pro — Sage & Lilac Edition: no red/pink/coral */
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
@@ -53,6 +44,14 @@ html,body,.stApp{font-family:'DM Sans',system-ui,sans-serif;color:var(--ink)}
    radial-gradient(circle,rgba(105,140,123,.065) .8px,transparent .9px),
    linear-gradient(160deg,#FBFCF9 0%,#F5F7F3 56%,#F6F4FD 100%);
  background-size:auto,auto,27px 27px,auto;
+}
+/* Hide Streamlit toolbar */
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+
+[data-testid="stDecoration"] {
+    display: none !important;
 }
 .main,section.main,[data-testid="stAppViewContainer"]{min-width:0}
 /* Streamlit's fixed header/toolbar is around 3.5rem high. Reserve sufficient vertical
