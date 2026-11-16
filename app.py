@@ -902,13 +902,12 @@ elif page=='Daily Automation':
 elif page=='Live SMTP':
     if _identity.get('role') != 'demo' and not ENABLE_LIVE_SMTP:
         st.title('SMTP Email Delivery')
-        st.warning('Live SMTP is paused during the public security preview. Your Gmail and SMTP credentials are not shared.')
-        st.info('Guest mode shows a simulation. After abuse-prevention controls are tested, the app owner can enable each user’s own SMTP connection with a server setting.')
+        st.warning('SMTP connections are temporarily unavailable. Please try again later.')
         st.stop()
     st.title('SMTP Email Delivery')
     st.caption("Connect your own email provider. This application never uses the owner's Gmail account to send another user's email.")
     if _identity.get('role')=='demo':
-        st.info('Guest demonstration — connection and sending are simulated. Create your own account to connect real SMTP.')
+        st.info('Preview mode: SMTP actions are simulated.')
         provider=st.selectbox('SMTP provider (demo)',list(PROVIDERS),key='guest_smtp_provider')
         relay=provider_config(provider)
         st.text_input('SMTP server',value=relay.host,disabled=True)
@@ -921,7 +920,7 @@ elif page=='Live SMTP':
         if st.button('Simulate Send Test Email'):
             with st.spinner('Simulating email sending...'):
                 st.success('Demo: test email simulated. No real email was sent.')
-               cid=campaign_select('Choose a demo campaign',key='demo_live_preview')
+        cid=campaign_select('Choose a demo campaign',key='demo_live_preview')
         if cid is not None:
             campaign=next(c for c in campaigns if c['id']==cid)
             person=contacts[0] if contacts else {
@@ -938,7 +937,6 @@ elif page=='Live SMTP':
             )
             components.html(preview_html,height=640,scrolling=True)
 
-        st.caption('Guest SMTP actions are fictional previews and are never reported as real delivery.')
     else:
         st.warning('Use only your own SMTP account. Its app password/key is sent securely to the Streamlit server for sending, held in that server session, and not saved to SQLite. Only use trusted hosting.')
         config=store.get_setting('smtp_preferences',{})
@@ -1095,6 +1093,7 @@ elif page=='Live SMTP':
         else:
             st.caption('No live campaign attempts yet.')
         st.caption('SMTP acceptance does not guarantee inbox delivery. The app does not claim opens or clicks.')
+
 
 elif page=='Reports':
     st.title('Campaign Reports')
