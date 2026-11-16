@@ -198,9 +198,11 @@ try:
 except ValueError as exc:
     st.error(str(exc)); st.stop()
 
-# This must remain disabled for a public deployment until abuse safeguards,
-# sender verification, monitoring, and provider limits have been reviewed.
-ENABLE_LIVE_SMTP=str(_config.get('MAILPILOT_ENABLE_LIVE_SMTP','false')).lower()=='true'
+ENABLE_LIVE_SMTP = (
+    str(_config.get('MAILPILOT_ENABLE_LIVE_SMTP', 'false')).lower() == 'true'
+    and _identity is not None
+    and _identity.get('role') == 'owner'
+)
 
 _identity=None
 _tokens=st.session_state.get('mailpilot_supabase_tokens')
@@ -882,7 +884,9 @@ elif page=='Daily Automation':
         st.caption('Each contact is simulated at most once per campaign. The global 10/day cap resets at midnight UTC. There is no background scheduler in this demo.')
 
 elif page=='Live SMTP':
-    if _identity.get('role')!='demo' and not ENABLE_LIVE_SMTP:
+    if _identity.get('role') != 'demo' and (
+        not ENABLE_LIVE_SMTP or _identity.get('role') != 'owner'
+    ):
         st.title('SMTP Email Delivery')
         st.warning('Live SMTP is paused during the public security preview. Your Gmail and SMTP credentials are not shared.')
         st.info('Guest mode shows a simulation. After abuse-prevention controls are tested, the app owner can enable each user’s own SMTP connection with a server setting.')
