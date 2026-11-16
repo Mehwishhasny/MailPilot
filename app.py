@@ -265,7 +265,23 @@ if not _identity:
                     st.rerun()
                 except (SupabaseError,KeyError):
                     st.error('Unable to sign in. Check your credentials and verify your email first.')
-            st.caption('Password recovery is being completed before public registration is enabled.')
+            if st.button('Forgot Password?', key='forgot_password'):
+    st.session_state['show_password_reset'] = True
+
+if st.session_state.get('show_password_reset', False):
+    with st.form('password_reset_request'):
+        reset_email = st.text_input('Your registered email address')
+        reset_clicked = st.form_submit_button('Send reset link')
+
+    if reset_clicked:
+        try:
+            _auth.recover(reset_email)
+            st.success(
+                'If this email is registered, you will receive '
+                'a password reset link.'
+            )
+        except (SupabaseError, ValueError):
+            st.error('Unable to process the request. Please try again later.')
         with signup:
             with st.form('mailpilot_signup',clear_on_submit=True):
                 full_name=st.text_input('Your name',max_chars=100)
