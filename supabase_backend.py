@@ -93,6 +93,23 @@ class SupabaseAuth:
                                headers=self._headers(newtokens['access_token']))
         return verified,newtokens
 
+    def verify_recovery_token(self, token_hash):
+        if not isinstance(token_hash, str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,512}', token_hash):
+            raise SupabaseError('Invalid password recovery link.')
+        result = _safe_request('POST', f'{self.url}/auth/v1/verify',
+                               headers=self._headers(),
+                               payload={'type': 'recovery', 'token_hash': token_hash})
+        if not isinstance(result, dict) or not result.get('access_token'):
+            raise SupabaseError('The password recovery link is invalid or expired.')
+        return result['access_token']
+
+    def update_password_with_recovery(self, access_token, password):
+        if not isinstance(password, str) or len(password) < 12 or len(password) > 128:
+            raise ValueError('Use a password between 12 and 128 characters.')
+        return _safe_request('PUT', f'{self.url}/auth/v1/user',
+                             headers=self._headers(access_token),
+                             payload={'password': password})
+
     def recover(self,email):
         email=(email or '').strip().lower()
         if not valid_email(email): raise ValueError('Enter a valid email address.')
