@@ -27,25 +27,6 @@ st.set_page_config(page_title='MailPilot Pro | Email Automation',page_icon='✉�
 st.set_option('client.toolbarMode', 'viewer')
 # Registered users use Supabase PostgreSQL; only guest demo writes a temporary SQLite file.
 
-/* Premium lavender logout button */
-[data-testid="stSidebar"] .st-key-mailpilot_logout button {
-    background: linear-gradient(110deg, #796AC2, #6253A8) !important;
-    color: #FFFFFF !important;
-    border: 1px solid #988BE0 !important;
-    border-radius: 12px !important;
-    font-weight: 700 !important;
-    min-height: 44px;
-    width: 100%;
-    box-shadow: 0 5px 16px rgba(40, 31, 88, 0.22);
-}
-
-[data-testid="stSidebar"] .st-key-mailpilot_logout button:hover {
-    background: #8A7BD3 !important;
-    color: #FFFFFF !important;
-    border-color: #B2A6ED !important;
-}
-
-
 st.markdown('''<style>
 /* MailPilot Pro — Sage & Lilac Edition: no red/pink/coral */
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
@@ -73,6 +54,19 @@ html,body,.stApp{font-family:'DM Sans',system-ui,sans-serif;color:var(--ink)}
  width:100%;
  padding:5.75rem clamp(1.1rem,2.6vw,2.9rem) 4.3rem !important;
  margin-inline:auto;
+}
+/* Premium lavender logout button */
+[data-testid="stSidebar"] .st-key-mailpilot_logout button {
+    background: #796AC2 !important;
+    color: white !important;
+    border-radius: 12px !important;
+    border: 1px solid #988BE0 !important;
+    font-weight: 700 !important;
+}
+
+[data-testid="stSidebar"] .st-key-mailpilot_logout button:hover {
+    background: #6253A8 !important;
+    color: white !important;
 }
 [data-testid="stSidebarUserContent"]{padding-top:2.8rem!important;padding-bottom:2.2rem!important}
 /* Keep mobile sidebar toggle and page titles above content rather than overlaying them. */
