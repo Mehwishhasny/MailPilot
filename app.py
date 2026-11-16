@@ -309,12 +309,14 @@ else:
 with st.sidebar:
     st.markdown('## ✉️ MailPilot **Pro**')
     st.caption('EMAIL MARKETING AUTOMATION')
-    st.caption('SIGNED IN: '+safe_html(_identity['email']))
-    if st.button('Log out',key='mailpilot_logout'):
+    st.caption('SIGNED IN: ' + safe_html(_identity['email']))
+
+    if st.button('Log out', key='mailpilot_logout'):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
-       if _identity['role'] != 'demo':
+
+    if _identity['role'] != 'demo':
         st.markdown(
             '<span class="small-chip">● MAILPILOT WORKSPACE</span>',
             unsafe_allow_html=True
