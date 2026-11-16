@@ -200,8 +200,6 @@ except ValueError as exc:
 
 ENABLE_LIVE_SMTP = (
     str(_config.get('MAILPILOT_ENABLE_LIVE_SMTP', 'false')).lower() == 'true'
-    and _identity is not None
-    and _identity.get('role') == 'owner'
 )
 
 _identity=None
