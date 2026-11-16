@@ -22,10 +22,19 @@ import streamlit as st
 from core import Store, MAX_DAILY, today, personalize, csv_bytes, compose_message, valid_email
 from smtp_providers import PROVIDERS, provider_config, validate_sender, test_smtp_login, send_via_user_smtp, friendly_error
 
-st.set_page_config(page_title='MailPilot Pro | Email Automation',page_icon='✉️',layout='wide',initial_sidebar_state='auto')
+st.set_page_config(page_title='MailPilot Pro | Email Automation',page_icon="mailpilot-icon.png",layout='wide',initial_sidebar_state='auto')
 # Hide Streamlit's built-in developer toolbar (including the Deploy button) locally.
 st.set_option('client.toolbarMode', 'viewer')
 # Registered users use Supabase PostgreSQL; only guest demo writes a temporary SQLite file.
+
+/* Hide Streamlit's top-right toolbar */
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+
+[data-testid="stDecoration"] {
+    display: none !important;
+}
 
 st.markdown('''<style>
 /* MailPilot Pro — Sage & Lilac Edition: no red/pink/coral */
