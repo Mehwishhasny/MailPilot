@@ -222,6 +222,65 @@ ENABLE_LIVE_SMTP = (
     str(_config.get('MAILPILOT_ENABLE_LIVE_SMTP', 'false')).lower() == 'true'
 )
 
+# Recovery links use a one-time token hash in the URL query parameters.
+# Streamlit cannot read Supabase's default URL-fragment tokens server-side.
+_reset_hash = st.query_params.get('reset_token')
+if _reset_hash:
+    st.title('Reset your MailPilot Pro password')
+    if 'mailpilot_recovery_access' not in st.session_state:
+        try:
+            st.session_state['mailpilot_recovery_access'] = _auth.verify_recovery_token(_reset_hash)
+        except (SupabaseError, ValueError):
+            st.error('This reset link is invalid or has expired. Request a new one from the login page.')
+            if st.button('Back to sign in', key='reset_back'):
+                st.query_params.clear()
+                st.rerun()
+            st.stop()
+        # Remove the one-time token from the browser address after verifying it.
+        st.query_params.clear()
+    with st.form('complete_password_reset'):
+        _new_password = st.text_input('New password (12+ characters)', type='password')
+        _confirm_password = st.text_input('Confirm new password', type='password')
+        _save_password = st.form_submit_button('Update password', type='primary')
+    if _save_password:
+        if _new_password != _confirm_password:
+            st.error('Passwords do not match.')
+        else:
+            try:
+                _auth.update_password_with_recovery(st.session_state['mailpilot_recovery_access'], _new_password)
+                st.session_state.pop('mailpilot_recovery_access', None)
+                st.session_state.pop('mailpilot_supabase_tokens', None)
+                st.session_state.pop('mailpilot_guest', None)
+                st.session_state['mailpilot_reset_success'] = True
+                st.rerun()
+            except (SupabaseError, ValueError):
+                st.error('Unable to reset the password. Request a fresh reset link and try again.')
+    st.stop()
+
+if 'mailpilot_recovery_access' in st.session_state:
+    st.title('Reset your MailPilot Pro password')
+    with st.form('complete_password_reset'):
+        _new_password = st.text_input('New password (12+ characters)', type='password')
+        _confirm_password = st.text_input('Confirm new password', type='password')
+        _save_password = st.form_submit_button('Update password', type='primary')
+    if _save_password:
+        if _new_password != _confirm_password:
+            st.error('Passwords do not match.')
+        else:
+            try:
+                _auth.update_password_with_recovery(st.session_state['mailpilot_recovery_access'], _new_password)
+                st.session_state.pop('mailpilot_recovery_access', None)
+                st.session_state.pop('mailpilot_supabase_tokens', None)
+                st.session_state.pop('mailpilot_guest', None)
+                st.session_state['mailpilot_reset_success'] = True
+                st.rerun()
+            except (SupabaseError, ValueError):
+                st.error('Unable to reset the password. Request a fresh reset link and try again.')
+    st.stop()
+
+if st.session_state.pop('mailpilot_reset_success', False):
+    st.success('Password updated successfully. Please sign in with your new password.')
+
 _identity=None
 _tokens=st.session_state.get('mailpilot_supabase_tokens')
 if _tokens:
@@ -1164,4 +1223,3 @@ else:
     st.subheader('Data management')
     st.download_button('Export all contacts',csv_bytes(contacts,['name','email','company','segment','subscribed','created_at']),'contacts-backup.csv','text/csv',disabled=not contacts)
     st.caption('Guest data is temporary. Member data is stored in Supabase. Only import consent-based contacts. Live SMTP is paused during this public security preview.')
-
