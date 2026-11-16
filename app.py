@@ -27,6 +27,24 @@ st.set_page_config(page_title='MailPilot Pro | Email Automation',page_icon='✉�
 st.set_option('client.toolbarMode', 'viewer')
 # Registered users use Supabase PostgreSQL; only guest demo writes a temporary SQLite file.
 
+/* Premium lavender logout button */
+[data-testid="stSidebar"] .st-key-mailpilot_logout button {
+    background: linear-gradient(110deg, #796AC2, #6253A8) !important;
+    color: #FFFFFF !important;
+    border: 1px solid #988BE0 !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    min-height: 44px;
+    width: 100%;
+    box-shadow: 0 5px 16px rgba(40, 31, 88, 0.22);
+}
+
+[data-testid="stSidebar"] .st-key-mailpilot_logout button:hover {
+    background: #8A7BD3 !important;
+    color: #FFFFFF !important;
+    border-color: #B2A6ED !important;
+}
+
 
 st.markdown('''<style>
 /* MailPilot Pro — Sage & Lilac Edition: no red/pink/coral */
@@ -302,13 +320,17 @@ with st.sidebar:
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
-    st.markdown('<span class="small-chip">● VERIFIED ACCOUNTS · GUEST DEMO</span>',unsafe_allow_html=True)
+       if _identity['role'] != 'demo':
+        st.markdown(
+            '<span class="small-chip">● MAILPILOT WORKSPACE</span>',
+            unsafe_allow_html=True
+        )
     page=st.radio('WORKSPACE',['Overview','Contacts','Campaign Studio','Daily Automation','Live SMTP','Reports','Settings & Guide']
                   + (['Admin • Users'] if _identity['role']=='owner' else []),label_visibility='collapsed')
     st.divider()
     st.caption('Python · Streamlit · Supabase · Plotly')
     st.caption('Row Level Security · Own-account data')
-    st.caption('v4.0 · Supabase Preview')
+    st.caption('MailPilot Pro · Email Marketing Platform')
 
 # -----------------------------------------------------------------------------
 # Branded HTML emails — safely previewed and optionally sent using the user's SMTP.
@@ -882,9 +904,7 @@ elif page=='Daily Automation':
         st.caption('Each contact is simulated at most once per campaign. The global 10/day cap resets at midnight UTC. There is no background scheduler in this demo.')
 
 elif page=='Live SMTP':
-    if _identity.get('role') != 'demo' and (
-        not ENABLE_LIVE_SMTP or _identity.get('role') != 'owner'
-    ):
+    if _identity.get('role') != 'demo' and not ENABLE_LIVE_SMTP:
         st.title('SMTP Email Delivery')
         st.warning('Live SMTP is paused during the public security preview. Your Gmail and SMTP credentials are not shared.')
         st.info('Guest mode shows a simulation. After abuse-prevention controls are tested, the app owner can enable each user’s own SMTP connection with a server setting.')
@@ -909,6 +929,13 @@ elif page=='Live SMTP':
         if cid is not None:
             campaign=next(c for c in campaigns if c['id']==cid)
             person=contacts[0] if contacts else {'name':'Alex','email':'demo@example.com','company':'Sample Co'}
+                    if _identity.get('role') != 'owner':
+            st.info(
+                'Your SMTP settings and connection test are available. '
+                'Email sending will be enabled after the remaining '
+                'account security checks are complete.'
+            )
+            st.stop()
             st.subheader('Preview your designed email')
             preview_html=render_branded_html(personalize(campaign['subject'],person),
                 personalize(campaign['body'],person),personalized_design(get_email_design(cid),person))
