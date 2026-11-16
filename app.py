@@ -921,21 +921,23 @@ elif page=='Live SMTP':
         if st.button('Simulate Send Test Email'):
             with st.spinner('Simulating email sending...'):
                 st.success('Demo: test email simulated. No real email was sent.')
-        cid=campaign_select('Choose a demo campaign',key='demo_live_preview')
+               cid=campaign_select('Choose a demo campaign',key='demo_live_preview')
         if cid is not None:
             campaign=next(c for c in campaigns if c['id']==cid)
-            person=contacts[0] if contacts else {'name':'Alex','email':'demo@example.com','company':'Sample Co'}
-                    if _identity.get('role') != 'owner':
-            st.info(
-                'Your SMTP settings and connection test are available. '
-                'Email sending will be enabled after the remaining '
-                'account security checks are complete.'
-            )
-            st.stop()
+            person=contacts[0] if contacts else {
+                'name':'Alex',
+                'email':'demo@example.com',
+                'company':'Sample Co'
+            }
+
             st.subheader('Preview your designed email')
-            preview_html=render_branded_html(personalize(campaign['subject'],person),
-                personalize(campaign['body'],person),personalized_design(get_email_design(cid),person))
+            preview_html=render_branded_html(
+                personalize(campaign['subject'],person),
+                personalize(campaign['body'],person),
+                personalized_design(get_email_design(cid),person)
+            )
             components.html(preview_html,height=640,scrolling=True)
+
         st.caption('Guest SMTP actions are fictional previews and are never reported as real delivery.')
     else:
         st.warning('Use only your own SMTP account. Its app password/key is sent securely to the Streamlit server for sending, held in that server session, and not saved to SQLite. Only use trusted hosting.')
@@ -999,6 +1001,13 @@ elif page=='Live SMTP':
                 except Exception as exc:
                     st.error(friendly_error(exc))
 
+        if _identity.get('role') != 'owner':
+            st.info(
+                'Your SMTP settings and connection test are available. '
+                'Email sending will be enabled after the remaining '
+                'account security checks are complete.'
+            )
+            st.stop()
         st.subheader('2. Send a real test to your own address')
         st.caption('To prevent abuse, test messages go only to your verified From email. Maximum 3 test attempts per UTC day.')
         remaining_tests=max(0,3-store.smtp_tests_used())
