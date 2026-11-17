@@ -1,15 +1,22 @@
-
+# MailPilot Pro - readable light UI on phones, regardless of device theme.
+# Email design presets in Campaign Studio remain independent.
 [theme]
+base = "light"
 primaryColor = "#796AC2"
 backgroundColor = "#FAFBF7"
 secondaryBackgroundColor = "#FFFFFF"
 textColor = "#25283A"
 font = "sans serif"
 
-[server]
-headless = true
-enableStaticServing = true
-fileWatcherType = "none"
+[theme.light]
+primaryColor = "#796AC2"
+backgroundColor = "#FAFBF7"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#25283A"
 
-[client]
-toolbarMode = "viewer"
+# Keep even a user-selected Streamlit Dark setting visually light.
+[theme.dark]
+primaryColor = "#796AC2"
+backgroundColor = "#FAFBF7"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#25283A"
