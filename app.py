@@ -349,9 +349,25 @@ if _tokens:
         _name=(_user.get('user_metadata') or {}).get('display_name','') or _email.split('@')[0]
         _owner_email=str(_config.get('MAILPILOT_ADMIN_EMAIL','')).strip().lower()
         _role='owner' if _owner_email and _email==_owner_email and _user.get('email_confirmed_at') else 'member'
-        _identity={'id':_user['id'],'name':_name,'email':_email,'role':_role}
+        _identity={
+            'id':_user['id'],
+            'name':_name,
+            'email':_email,
+            'role':_role,
+            'email_verified':bool(_user.get('email_confirmed_at')),
+        }
+        # Avoid carrying an SMTP App Password into another user's session.
+        if st.session_state.get('mailpilot_active_user_id') != _identity['id']:
+            for key in list(st.session_state.keys()):
+                if key.startswith('smtp_'):
+                    st.session_state.pop(key, None)
+            st.session_state['mailpilot_active_user_id'] = _identity['id']
     except (SupabaseError,KeyError,ValueError):
         st.session_state.pop('mailpilot_supabase_tokens',None)
+        st.session_state.pop('mailpilot_active_user_id', None)
+        for key in list(st.session_state.keys()):
+            if key.startswith('smtp_'):
+                st.session_state.pop(key, None)
 
 if not _identity and st.session_state.get('mailpilot_guest'):
     _identity={'id':None,'name':'Guest','email':'Demo visitor','role':'demo'}
@@ -1148,12 +1164,11 @@ elif page=='Live SMTP':
                 except Exception as exc:
                     st.error(friendly_error(exc))
 
-        if _identity.get('role') != 'owner':
-            st.info(
-                'Your SMTP settings and connection test are available. '
-                'Email sending will be enabled after the remaining '
-                'account security checks are complete.'
-            )
+        # All authenticated, email-verified members may use their own SMTP
+        # account. Guest visitors remain simulation-only. The configured
+        # server-wide switch and existing daily caps still apply.
+        if not _identity.get('email_verified', False):
+            st.warning('Verify your MailPilot Pro account email before live sending.')
             st.stop()
         st.subheader('2. Send a real test to your own address')
         st.caption('To prevent abuse, test messages go only to your verified From email. Maximum 3 test attempts per UTC day.')
