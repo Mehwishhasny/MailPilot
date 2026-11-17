@@ -1246,7 +1246,7 @@ elif page=='Live SMTP':
                     st.warning(f"{person['email']}: {friendly_error(exc)}")
                 progress.progress(idx/min(len(chosen),remaining),text=f'Sending {idx} of {min(len(chosen),remaining)}')
             st.session_state['smtp_last_result']=f'SMTP accepted {successes} message(s). Failed: {failures}. See delivery log.'
-            st.rerun()
+            # st.rerun()
         if not can_send:
             st.caption('To send: enter your own SMTP login/key, create a campaign, select real opted-in contacts, confirm permission, and type SEND.')
         if st.session_state.get('smtp_last_result'):
