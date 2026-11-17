@@ -4,9 +4,8 @@
 <body><main class="card"><h1>Reset your password</h1><p id="message">Checking your secure reset link…</p><form id="form" hidden><label>New password<input id="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required></label><label>Confirm new password<input id="confirm" type="password" minlength="12" maxlength="128" autocomplete="new-password" required></label><button id="submit" type="submit">Update password</button></form><p><a href="/">Back to MailPilot Pro</a></p></main>
 <script>
 'use strict';
-// Replace the following two PUBLIC configuration values from Supabase Project Settings → API.
-const SUPABASE_URL = 'PASTE_YOUR_SUPABASE_PROJECT_URL_HERE';
-const SUPABASE_PUBLISHABLE_KEY = 'PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE';
+const SUPABASE_URL = 'https://cpdmgvizcovfakbmbcjd.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_qKmFbuNoCv2X8KuDiaYG8w_ANtucaPI';
 const message = document.getElementById('message');
 const form = document.getElementById('form');
 const submit = document.getElementById('submit');
@@ -14,7 +13,6 @@ const fragment = new URLSearchParams(location.hash.slice(1));
 const accessToken = fragment.get('access_token');
 const type = fragment.get('type');
 const error = fragment.get('error_description') || fragment.get('error');
-// Remove credentials from the address bar before any requests or user interaction.
 history.replaceState(null, '', location.pathname);
 async function authRequest(method, path, body) {
   const response = await fetch(SUPABASE_URL.replace(/\/$/, '') + path, {
