@@ -397,8 +397,8 @@ if not _identity:
                             'If this email is registered, you will receive '
                             'a password reset link.'
                         )
-                    except (SupabaseError, ValueError):
-                        st.error('Unable to process the request. Please try again later.')
+                 except (SupabaseError, ValueError) as e:
+                    st.error(f"Password reset failed: {e}")
         with signup:
             with st.form('mailpilot_signup',clear_on_submit=True):
                 full_name=st.text_input('Your name',max_chars=100)
