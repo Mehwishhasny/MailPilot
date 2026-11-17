@@ -256,6 +256,50 @@ p,label{overflow-wrap:break-word}
   }
 }
 
+
+/* LIGHT MODE ON MOBILE: keep the app interface light even on dark-mode phones.
+   Email theme presets are independent, and can still feature dark email designs. */
+@media (max-width: 760px) {
+  :root, html, body, .stApp, [data-testid="stAppViewContainer"] {
+    color-scheme: light !important;
+    --primary-color: #796AC2 !important;
+    --background-color: #FAFBF7 !important;
+    --secondary-background-color: #FFFFFF !important;
+    --text-color: #25283A !important;
+  }
+  html, body, .stApp,
+  [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+    background-color: #FAFBF7 !important;
+    color: #25283A !important;
+  }
+  [data-testid="stSidebar"] {
+    background: linear-gradient(155deg,#F3F0FF 0%,#EDF5F2 100%) !important;
+    border-right: 1px solid #DCDDE7 !important;
+  }
+  [data-testid="stSidebar"] * {
+    color: #2C3549 !important;
+  }
+  [data-testid="stSidebar"] .st-key-mailpilot_logout button,
+  [data-testid="stSidebar"] .st-key-mailpilot_logout button * {
+    color: #FFFFFF !important;
+  }
+  [data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+    background-color: #E4E0FA !important;
+  }
+  [data-testid="stTextInput"] input,
+  [data-testid="stTextArea"] textarea,
+  [data-testid="stSelectbox"] > div > div,
+  [data-testid="stMultiSelect"] > div > div,
+  [data-testid="stFileUploader"],
+  [data-testid="stExpander"] {
+    background-color: #FFFFFF !important;
+    color: #25283A !important;
+  }
+  [data-testid="stWidgetLabel"] {
+    color: #2C3549;
+  }
+}
+
 </style>''',unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
@@ -548,6 +592,18 @@ EMAIL_THEMES = {
     },
 }
 EMAIL_LAYOUTS = ['Classic', 'Image-first', 'Promotional']
+EMAIL_PICTURE_SIZES = {
+    'Small (200px)': 200,
+    'Medium (350px)': 350,
+    'Large (500px)': 500,
+    'Full width': 572,
+}
+
+
+def email_image_dimension(size):
+    """Return a safe, responsive maximum width for email pictures."""
+    return EMAIL_PICTURE_SIZES.get(size, 350)
+
 PATTERN_OPTIONS = ['Waves', 'Soft curves', 'Minimal bands']
 DEFAULT_EMAIL_DESIGN = {
     'brand': 'MailPilot Pro',
@@ -561,6 +617,8 @@ DEFAULT_EMAIL_DESIGN = {
     'footer_pattern': 'Waves',
     'theme': 'Sage & Lilac',
     'layout': 'Classic',
+    'picture_size': 'Medium (350px)',
+    'banner_size': 'Medium (350px)',
     'custom_colors': 'false',
     'custom_header': EMAIL_THEMES['Sage & Lilac']['header'],
     'custom_accent': EMAIL_THEMES['Sage & Lilac']['accent'],
@@ -614,6 +672,9 @@ def get_email_design(campaign_id=None):
         result['theme'] = 'Sage & Lilac'
     if result['layout'] not in EMAIL_LAYOUTS:
         result['layout'] = 'Classic'
+    for size_key in ('picture_size', 'banner_size'):
+        if result[size_key] not in EMAIL_PICTURE_SIZES:
+            result[size_key] = 'Medium (350px)'
     return result
 
 
@@ -626,6 +687,9 @@ def save_email_design(campaign_id, design):
         raise ValueError('Choose a valid email theme.')
     if selected['layout'] not in EMAIL_LAYOUTS:
         raise ValueError('Choose a valid email layout.')
+    for size_key in ('picture_size', 'banner_size'):
+        if selected[size_key] not in EMAIL_PICTURE_SIZES:
+            raise ValueError('Choose a valid image size.')
     for field in ('custom_header', 'custom_accent', 'custom_button', 'custom_footer'):
         if not is_valid_hex(selected[field]):
             raise ValueError('Choose valid custom color values.')
@@ -714,11 +778,14 @@ def render_branded_html(subject, body, design, sender='', unsubscribe='', image_
     hero = safe_https_url(opts.get('hero_url', ''))
     cta_url = safe_https_url(opts.get('button_url', ''))
     button_label = safe_html(str(opts.get('button_label') or '').strip())
+    banner_width = email_image_dimension(opts.get('banner_size', 'Medium (350px)'))
+    picture_size = (inline_image or {}).get('display_size') or opts.get('picture_size', 'Medium (350px)')
+    picture_width = email_image_dimension(picture_size)
 
     hero_html = (
         '<tr><td style="padding:5px 34px 14px;">'
-        f'<img src="{safe_html(hero, quote=True)}" alt="Campaign banner" width="572" '
-        'style="display:block;width:100%;max-width:572px;height:auto;border:0;border-radius:12px;">'
+        f'<img src="{safe_html(hero, quote=True)}" alt="Campaign banner" width="{banner_width}" '
+        f'style="display:block;width:100%;max-width:{banner_width}px;height:auto;border:0;border-radius:12px;margin:0 auto;">'
         '</td></tr>'
     ) if hero else ''
 
@@ -732,8 +799,8 @@ def render_branded_html(subject, body, design, sender='', unsubscribe='', image_
         alt = safe_html(str(inline_image['filename']), quote=True)
         inline_html = (
             '<div style="margin:20px 0 24px;">'
-            f'<img src="{picture_src}" alt="{alt}" width="560" '
-            'style="display:block;width:100%;max-width:560px;height:auto;border:0;border-radius:12px;">'
+            f'<img src="{picture_src}" alt="{alt}" width="{picture_width}" '
+            f'style="display:block;width:100%;max-width:{picture_width}px;height:auto;border:0;border-radius:12px;margin:0 auto;">'
             '</div>'
         )
 
@@ -791,6 +858,7 @@ def render_branded_html(subject, body, design, sender='', unsubscribe='', image_
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
 <title>{safe_html(subject)}</title></head>
 <body style="margin:0;padding:0;background-color:{colors['page']};">
 <div style="display:none!important;max-height:0;overflow:hidden;opacity:0;color:transparent;">{preheader}</div>
@@ -1230,6 +1298,17 @@ elif page=='Campaign Studio':
             selected_layout = st.radio('Email layout', EMAIL_LAYOUTS, horizontal=True,
                 index=EMAIL_LAYOUTS.index(current_design['layout']), key=f'email_layout_{design_cid}')
             st.caption('Classic: balanced newsletter · Image-first: visuals before text · Promotional: featured offer and prominent action')
+            size_a, size_b = st.columns(2)
+            picture_names = list(EMAIL_PICTURE_SIZES)
+            saved_picture_size = current_design.get('picture_size', 'Medium (350px)')
+            saved_banner_size = current_design.get('banner_size', 'Medium (350px)')
+            picture_size = size_a.selectbox('Uploaded picture size in email', picture_names,
+                index=picture_names.index(saved_picture_size) if saved_picture_size in picture_names else 1,
+                key=f'email_picture_size_{design_cid}')
+            banner_size = size_b.selectbox('Banner image size', picture_names,
+                index=picture_names.index(saved_banner_size) if saved_banner_size in picture_names else 1,
+                key=f'email_banner_size_{design_cid}')
+            st.caption('Medium (350px) is the default; all sizes fit automatically on narrow phone screens.')
             use_custom = st.checkbox('Customize theme colors',
                 value=str(current_design.get('custom_colors', 'false')).lower() == 'true',
                 key=f'email_use_custom_{design_cid}')
@@ -1275,6 +1354,7 @@ elif page=='Campaign Studio':
 
             draft_design = {
                 'theme': selected_theme, 'layout': selected_layout,
+                'picture_size': picture_size, 'banner_size': banner_size,
                 'custom_colors': 'true' if use_custom else 'false',
                 'custom_header': custom_header, 'custom_accent': custom_accent,
                 'custom_button': custom_button, 'custom_footer': custom_footer,
@@ -1454,6 +1534,11 @@ elif page=='Live SMTP':
             key='smtp_embedded_picture',
             help='PNG, JPEG or WEBP, max 3 MB. The image appears below the email text.'
         )
+        uploaded_picture_size = st.selectbox(
+            'Uploaded picture display size', list(EMAIL_PICTURE_SIZES), index=1,
+            key='smtp_uploaded_picture_size',
+            help='Controls picture width in both test emails and live campaigns. Default Medium (350px).'
+        )
         attachments_ok = True
         email_attachments = []
         email_inline_image = None
@@ -1461,6 +1546,8 @@ elif page=='Live SMTP':
             email_attachments, email_inline_image = prepare_email_uploads(
                 uploaded_attachments, uploaded_inline_image
             )
+            if email_inline_image:
+                email_inline_image['display_size'] = uploaded_picture_size
         except ValueError as exc:
             attachments_ok = False
             st.error(str(exc))
