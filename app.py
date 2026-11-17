@@ -1212,10 +1212,25 @@ elif page=='Live SMTP':
             progress=st.progress(0,text=f'Sending 0 of {min(len(chosen),remaining)}')
             for idx,candidate in enumerate(chosen[:remaining],1):
                 message_error=''
+             
                 try:
-                    person=store.reserve_live(send_cid,candidate['email'])
-                except ValueError:
-                    st.warning('A selected recipient is no longer eligible.');continue
+                    person = store.reserve_live(
+                        send_cid, candidate['email']
+                    )
+                except SupabaseError as exc:
+                    print(
+                        f"LIVE SMTP RESERVE ERROR: {exc}",
+                        flush=True
+                    )
+                    st.error(
+                        "Unable to prepare recipient. "
+                        "Check Streamlit logs."
+                    )
+                    continue
+                except ValueError as exc:
+                    st.warning(f"Recipient skipped: {exc}")
+                    continue
+
                 try:
                     message=compose_branded_message(sender.strip(),person['email'],
                         personalize(campaign['subject'],person),personalize(campaign['body'],person),
