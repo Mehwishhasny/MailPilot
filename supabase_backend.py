@@ -110,10 +110,23 @@ class SupabaseAuth:
                              headers=self._headers(access_token),
                              payload={'password': password})
 
-    def recover(self,email):
-        email=(email or '').strip().lower()
-        if not valid_email(email): raise ValueError('Enter a valid email address.')
-        _safe_request('POST',f'{self.url}/auth/v1/recover',headers=self._headers(),payload={'email':email})
+ 
+    def recover(self, email):
+        email = (email or '').strip().lower()
+        if not valid_email(email):
+            raise ValueError('Enter a valid email address.')
+
+        _safe_request(
+            'POST',
+            f'{self.url}/auth/v1/recover',
+            headers=self._headers(),
+            params={
+                'redirect_to':
+                'https://mailpilot-pro.streamlit.app/app/static/reset.html'
+            },
+            payload={'email': email}
+        )
+
 
 
 class SupabaseStore:
