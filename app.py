@@ -197,6 +197,64 @@ p,label{overflow-wrap:break-word}
 @media (prefers-reduced-motion:reduce){
  .stButton>button,.stDownloadButton>button,.stFormSubmitButton>button{transition:none!important;transform:none!important}
 }
+
+/* MailPilot Pro — Mobile login improvements */
+@media (max-width: 760px) {
+
+  .block-container,
+  [data-testid="stMainBlockContainer"] {
+    padding-top: 4.5rem !important;
+  }
+
+  /* Readable input labels and tabs */
+  [data-testid="stTextInput"] label,
+  [data-testid="stCheckbox"] label,
+  [data-testid="stTabs"] button {
+    color: #303449 !important;
+    opacity: 1 !important;
+  }
+
+  /* Input fields */
+  [data-testid="stTextInput"] input {
+    background: #FFFFFF !important;
+    color: #303449 !important;
+    border: 1px solid #CBD5D0 !important;
+    border-radius: 11px !important;
+  }
+
+  [data-testid="stTextInput"] input::placeholder {
+    color: #818B88 !important;
+  }
+
+  /* All regular buttons */
+  .stButton > button,
+  .stFormSubmitButton > button {
+    background: #EDE9FC !important;
+    color: #51458D !important;
+    border: 1px solid #CFC7EC !important;
+    border-radius: 12px !important;
+  }
+
+  /* Primary buttons */
+  .stFormSubmitButton > button[kind="primary"],
+  .stButton > button[kind="primary"] {
+    background: linear-gradient(
+      110deg, #796AC2, #3C9E85
+    ) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+  }
+
+  /* Reduce excess spacing */
+  [data-testid="stForm"] {
+    padding: 15px !important;
+  }
+
+  .stButton > button {
+    min-height: 43px !important;
+  }
+}
+
 </style>''',unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
