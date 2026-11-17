@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw
 from urllib.parse import urlparse
 import json
 import os
+import mimetypes
 from supabase_backend import SupabaseAuth, SupabaseStore, SupabaseError
 import re
 import streamlit.components.v1 as components
@@ -500,18 +501,53 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # Registered users save designs in Supabase. Guest data is temporary SQLite.
 
-# One consistent premium look, not a palette picker.
-EMAIL_COLORS = {
-    'ink': '#2C3549',
-    'muted': '#667583',
-    'purple': '#796DC0',
-    'sage': '#3F9A83',
-    'champagne': '#BEA56B',
-    'lavender_light': '#F0EFFA',
-    'sage_light': '#E8F4EE',
-    'body': '#FFFFFF',
-    'border': '#DFE7E3',
+# Email designer: six preset themes, three layouts, and optional custom colors.
+# Existing campaign designs default to the original Sage & Lilac theme.
+EMAIL_THEMES = {
+    'Sage & Lilac': {
+        'header': '#F0EFFA', 'header_text': '#2C3549', 'accent': '#796DC0',
+        'button': '#3F9A83', 'button_text': '#FFFFFF', 'footer': '#E8F4EE',
+        'footer_text': '#34483F', 'page': '#F6F7F5', 'ink': '#2C3549',
+        'muted': '#667583', 'border': '#DFE7E3',
+        'wave_1': '#CBE1DA', 'wave_2': '#E4DDF5', 'wave_3': '#FFFFFF',
+    },
+    'Corporate Luxury': {
+        'header': '#172638', 'header_text': '#FFFFFF', 'accent': '#B99A62',
+        'button': '#B99A62', 'button_text': '#172638', 'footer': '#213349',
+        'footer_text': '#FFFFFF', 'page': '#F4F4F1', 'ink': '#26364A',
+        'muted': '#657586', 'border': '#DDDCD7',
+        'wave_1': '#344A5F', 'wave_2': '#EAE2D4', 'wave_3': '#FFFFFF',
+    },
+    'Modern Professional': {
+        'header': '#E7F1FA', 'header_text': '#203C58', 'accent': '#326EAB',
+        'button': '#266BA8', 'button_text': '#FFFFFF', 'footer': '#E8F1F9',
+        'footer_text': '#264760', 'page': '#F5F8FC', 'ink': '#263B54',
+        'muted': '#63798C', 'border': '#DCE6EF',
+        'wave_1': '#B8D2EB', 'wave_2': '#D6E6F5', 'wave_3': '#FFFFFF',
+    },
+    'Warm Minimal': {
+        'header': '#F9F1E7', 'header_text': '#594638', 'accent': '#A37552',
+        'button': '#8C6750', 'button_text': '#FFFFFF', 'footer': '#F5ECDF',
+        'footer_text': '#654E3B', 'page': '#FCF9F5', 'ink': '#51453C',
+        'muted': '#82766B', 'border': '#E9DED1',
+        'wave_1': '#EAD6BD', 'wave_2': '#F3E8D9', 'wave_3': '#FFFFFF',
+    },
+    'Dark Elegance': {
+        'header': '#252733', 'header_text': '#FFFFFF', 'accent': '#D6B978',
+        'button': '#C3A76C', 'button_text': '#24242D', 'footer': '#30323F',
+        'footer_text': '#FFFFFF', 'page': '#F4F3F1', 'ink': '#363646',
+        'muted': '#727184', 'border': '#E1DFDD',
+        'wave_1': '#4A4552', 'wave_2': '#EDE6DA', 'wave_3': '#FFFFFF',
+    },
+    'Creative Marketing': {
+        'header': '#F4EAFE', 'header_text': '#44315F', 'accent': '#8252C6',
+        'button': '#7044B6', 'button_text': '#FFFFFF', 'footer': '#FFF0DF',
+        'footer_text': '#624B65', 'page': '#FCF8FF', 'ink': '#433A56',
+        'muted': '#776B82', 'border': '#E7DAEE',
+        'wave_1': '#DDC8FA', 'wave_2': '#FFE8CB', 'wave_3': '#FFFFFF',
+    },
 }
+EMAIL_LAYOUTS = ['Classic', 'Image-first', 'Promotional']
 PATTERN_OPTIONS = ['Waves', 'Soft curves', 'Minimal bands']
 DEFAULT_EMAIL_DESIGN = {
     'brand': 'MailPilot Pro',
@@ -523,7 +559,45 @@ DEFAULT_EMAIL_DESIGN = {
     'footer': 'You are receiving this email because you subscribed to our updates.',
     'header_pattern': 'Waves',
     'footer_pattern': 'Waves',
+    'theme': 'Sage & Lilac',
+    'layout': 'Classic',
+    'custom_colors': 'false',
+    'custom_header': EMAIL_THEMES['Sage & Lilac']['header'],
+    'custom_accent': EMAIL_THEMES['Sage & Lilac']['accent'],
+    'custom_button': EMAIL_THEMES['Sage & Lilac']['button'],
+    'custom_footer': EMAIL_THEMES['Sage & Lilac']['footer'],
 }
+
+
+def is_valid_hex(value):
+    return isinstance(value, str) and bool(re.fullmatch(r'#[0-9a-fA-F]{6}', value))
+
+
+def contrasting_text(color):
+    """Choose a readable text color for user-picked backgrounds."""
+    color = color.lstrip('#')
+    channels = [int(color[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    linear = [(x / 12.92 if x <= .04045 else ((x + .055) / 1.055) ** 2.4) for x in channels]
+    luminance = .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2]
+    return '#263044' if luminance > .29 else '#FFFFFF'
+
+
+def resolve_email_colors(design):
+    theme = design.get('theme', 'Sage & Lilac')
+    colors = dict(EMAIL_THEMES.get(theme, EMAIL_THEMES['Sage & Lilac']))
+    use_custom = str(design.get('custom_colors', 'false')).lower() in ('true', '1', 'yes')
+    if use_custom:
+        for key, color_key in (
+            ('header', 'custom_header'), ('accent', 'custom_accent'),
+            ('button', 'custom_button'), ('footer', 'custom_footer'),
+        ):
+            proposed = design.get(color_key)
+            if is_valid_hex(proposed):
+                colors[key] = proposed.upper()
+        colors['header_text'] = contrasting_text(colors['header'])
+        colors['footer_text'] = contrasting_text(colors['footer'])
+        colors['button_text'] = contrasting_text(colors['button'])
+    return colors
 
 
 def load_email_designs():
@@ -531,18 +605,32 @@ def load_email_designs():
 
 
 def get_email_design(campaign_id=None):
-    saved=load_email_designs().get(str(campaign_id),{}) if campaign_id is not None else {}
-    if not isinstance(saved,dict): saved={}
-    return {**DEFAULT_EMAIL_DESIGN, **{k:v for k,v in saved.items() if k in DEFAULT_EMAIL_DESIGN}}
+    saved = load_email_designs().get(str(campaign_id), {}) if campaign_id is not None else {}
+    if not isinstance(saved, dict):
+        saved = {}
+    cleaned = {k: v for k, v in saved.items() if k in DEFAULT_EMAIL_DESIGN}
+    result = {**DEFAULT_EMAIL_DESIGN, **cleaned}
+    if result['theme'] not in EMAIL_THEMES:
+        result['theme'] = 'Sage & Lilac'
+    if result['layout'] not in EMAIL_LAYOUTS:
+        result['layout'] = 'Classic'
+    return result
 
 
 def save_email_design(campaign_id, design):
-    existing=load_email_designs()
-    existing[str(campaign_id)]={
-        key:str(design.get(key,DEFAULT_EMAIL_DESIGN[key]))
-        for key in DEFAULT_EMAIL_DESIGN
-    }
-    store.set_setting('email_designs',existing)
+    existing = load_email_designs()
+    if not isinstance(existing, dict):
+        existing = {}
+    selected = {key: str(design.get(key, DEFAULT_EMAIL_DESIGN[key])) for key in DEFAULT_EMAIL_DESIGN}
+    if selected['theme'] not in EMAIL_THEMES:
+        raise ValueError('Choose a valid email theme.')
+    if selected['layout'] not in EMAIL_LAYOUTS:
+        raise ValueError('Choose a valid email layout.')
+    for field in ('custom_header', 'custom_accent', 'custom_button', 'custom_footer'):
+        if not is_valid_hex(selected[field]):
+            raise ValueError('Choose valid custom color values.')
+    existing[str(campaign_id)] = selected
+    store.set_setting('email_designs', existing)
 
 
 def safe_https_url(value):
@@ -570,153 +658,277 @@ def html_paragraphs(body):
     )
 
 
-def _wave_png(area='header', style='Waves'):
-    """Generate email-safe embedded PNG artwork; no image hosting needed.
+def _wave_png(area='header', style='Waves', colors=None):
+    """Generate themed, email-safe embedded PNG wave artwork."""
+    c = colors or resolve_email_colors(DEFAULT_EMAIL_DESIGN)
+    style = style if style in PATTERN_OPTIONS else 'Waves'
+    width, height = 1100, 208
+    bg = c['header'] if area == 'header' else '#FFFFFF'
+    picture = Image.new('RGB', (width, height), bg)
+    draw = ImageDraw.Draw(picture)
+    twopi = 2 * math.pi
+    a, b, d = {'Waves': (22, 20, 18), 'Soft curves': (13, 12, 11), 'Minimal bands': (4, 5, 5)}[style]
+    waves = 1.38 if style == 'Waves' else (.82 if style == 'Soft curves' else 1.0)
 
-    Gmail can ignore inline SVG and some CSS gradients, so this produces PNGs
-    attached to outgoing MIME messages with Content-ID (CID).
-    """
-    style=style if style in PATTERN_OPTIONS else 'Waves'
-    width,height=1100,208
-    bg=(241,239,250) if area=='header' else (255,255,255)
-    image=Image.new('RGB',(width,height),bg)
-    draw=ImageDraw.Draw(image)
-    twopi=2*math.pi
-    amps={'Waves':(22,20,18),'Soft curves':(13,12,11),'Minimal bands':(4,5,5)}
-    a,b,c=amps[style]
-    waves=1.38 if style=='Waves' else (0.82 if style=='Soft curves' else 1.0)
-    def stripe(level,amp,phase,fill):
-        upper=[(x, round(level+amp*math.sin(twopi*waves*x/(width-1)+phase))) for x in range(0,width,3)]
-        upper.append((width-1,round(level+amp*math.sin(twopi*waves+phase))))
-        draw.polygon(upper+[(width-1,height),(0,height)],fill=fill)
-    if area=='header':
-        # Pale lilac -> sage wave -> soft lilac -> pure white message area.
-        stripe(75,a,0.0,(203,225,218))
-        stripe(118,b,1.7,(228,221,245))
-        stripe(159,c,0.7,(255,255,255))
-        # Elegant dotted corner motif above the waves.
-        for r in range(3):
-            for j in range(16):
-                x=70+j*25; y=13+r*19
-                color=(193,186,225) if (j+r)%3 else (171,203,188)
-                draw.ellipse((x,y,x+3,y+3),fill=color)
-        for x,y,rad in [(850,30,5),(895,52,3),(965,28,7),(1010,60,3)]:
-            draw.ellipse((x-rad,y-rad,x+rad,y+rad),outline=(188,184,222),width=2)
+    def stripe(level, amplitude, phase, fill):
+        upper = [(x, round(level + amplitude * math.sin(twopi * waves * x / (width - 1) + phase)))
+                 for x in range(0, width, 3)]
+        upper.append((width - 1, round(level + amplitude * math.sin(twopi * waves + phase))))
+        draw.polygon(upper + [(width - 1, height), (0, height)], fill=fill)
+
+    if area == 'header':
+        stripe(75, a, 0.0, c['wave_1'])
+        stripe(118, b, 1.7, c['wave_2'])
+        stripe(159, d, 0.7, '#FFFFFF')
+        for row in range(2):
+            for col in range(12):
+                x, y = 70 + col * 25, 14 + row * 19
+                draw.ellipse((x, y, x + 3, y + 3), fill=c['accent'])
     else:
-        # White message area -> pale lilac -> pale cream -> soft sage footer.
-        stripe(48,a,0.9,(230,225,245))
-        stripe(101,b,2.2,(246,240,226))
-        stripe(151,c,1.1,(232,244,238))
-        for r in range(2):
-            for j in range(13):
-                x=680+j*26; y=167+r*16
-                color=(193,201,198) if (j+r)%2 else (191,185,221)
-                draw.ellipse((x,y,x+3,y+3),fill=color)
-    out=BytesIO()
-    image.save(out,format='PNG',optimize=True)
-    return out.getvalue()
+        stripe(48, a, 0.9, c['wave_2'])
+        stripe(101, b, 2.2, c['wave_1'])
+        stripe(151, d, 1.1, c['footer'])
+    output = BytesIO()
+    picture.save(output, format='PNG', optimize=True)
+    return output.getvalue()
 
 
-def _wave_src(area,style,image_mode):
-    if image_mode=='cid':
+def _wave_src(area, style, image_mode, colors):
+    if image_mode == 'cid':
         return f'cid:mailpilot-{area}-wave@local'
-    encoded=base64.b64encode(_wave_png(area,style)).decode('ascii')
-    return 'data:image/png;base64,'+encoded
+    encoded = base64.b64encode(_wave_png(area, style, colors)).decode('ascii')
+    return 'data:image/png;base64,' + encoded
 
 
-def render_branded_html(subject,body,design,sender='',unsubscribe='',image_mode='data'):
-    """Full HTML preview with embedded images, or CID-based email HTML."""
-    opts={**DEFAULT_EMAIL_DESIGN,**(design or {})}
-    brand=safe_html(str(opts.get('brand') or 'Your Team').strip())
-    title=safe_html(str(opts.get('heading') or subject).strip())
-    preheader=safe_html(str(opts.get('preheader') or '').strip())
-    footer=safe_html(str(opts.get('footer') or '').strip()).replace('\n','<br>')
-    header_style=opts.get('header_pattern','Waves')
-    footer_style=opts.get('footer_pattern','Waves')
-    header_src=_wave_src('header',header_style,image_mode)
-    footer_src=_wave_src('footer',footer_style,image_mode)
-    hero=safe_https_url(opts.get('hero_url',''))
-    cta_url=safe_https_url(opts.get('button_url',''))
-    button_label=safe_html(str(opts.get('button_label') or '').strip())
-    hero_html=(
-        '<tr><td style="padding:0 30px 10px;">'
-        f'<img src="{safe_html(hero,quote=True)}" alt="Campaign banner" width="580" '
-        'style="display:block;width:100%;max-width:580px;height:auto;border:0;border-radius:14px;">'
+def render_branded_html(subject, body, design, sender='', unsubscribe='', image_mode='data', inline_image=None):
+    """Render the same theme/layout for the interactive preview and real MIME email."""
+    opts = {**DEFAULT_EMAIL_DESIGN, **(design or {})}
+    colors = resolve_email_colors(opts)
+    layout = opts['layout'] if opts['layout'] in EMAIL_LAYOUTS else 'Classic'
+    brand = safe_html(str(opts.get('brand') or 'Your Team').strip())
+    title = safe_html(str(opts.get('heading') or subject).strip())
+    preheader = safe_html(str(opts.get('preheader') or '').strip())
+    footer = safe_html(str(opts.get('footer') or '').strip()).replace('\n', '<br>')
+    header_src = _wave_src('header', opts.get('header_pattern', 'Waves'), image_mode, colors)
+    footer_src = _wave_src('footer', opts.get('footer_pattern', 'Waves'), image_mode, colors)
+    hero = safe_https_url(opts.get('hero_url', ''))
+    cta_url = safe_https_url(opts.get('button_url', ''))
+    button_label = safe_html(str(opts.get('button_label') or '').strip())
+
+    hero_html = (
+        '<tr><td style="padding:5px 34px 14px;">'
+        f'<img src="{safe_html(hero, quote=True)}" alt="Campaign banner" width="572" '
+        'style="display:block;width:100%;max-width:572px;height:auto;border:0;border-radius:12px;">'
         '</td></tr>'
     ) if hero else ''
-    cta_html=(
-        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">'
-        '<tr><td bgcolor="#3F9A83" style="background-color:#3F9A83;border-radius:8px;">'
-        f'<a href="{safe_html(cta_url,quote=True)}" style="display:inline-block;padding:15px 26px;'
-        f'font-size:15px;font-weight:700;color:#FFFFFF;text-decoration:none;">{button_label}</a>'
-        '</td></tr></table>'
-    ) if cta_url and button_label else ''
-    unsub=safe_https_url(unsubscribe)
-    unsub_html=(
-        f'<a href="{safe_html(unsub,quote=True)}" style="color:#3F806E;text-decoration:underline;">Unsubscribe</a>'
-        if unsub else 'To unsubscribe, reply to this email with UNSUBSCRIBE.'
+
+    inline_html = ''
+    if inline_image:
+        if image_mode == 'cid':
+            picture_src = 'cid:mailpilot-uploaded-image@local'
+        else:
+            picture_src = ('data:' + inline_image['mime'] + ';base64,'
+                           + base64.b64encode(inline_image['data']).decode('ascii'))
+        alt = safe_html(str(inline_image['filename']), quote=True)
+        inline_html = (
+            '<div style="margin:20px 0 24px;">'
+            f'<img src="{picture_src}" alt="{alt}" width="560" '
+            'style="display:block;width:100%;max-width:560px;height:auto;border:0;border-radius:12px;">'
+            '</div>'
+        )
+
+    if layout == 'Image-first':
+        # For the image-first layout, a linked hero goes above the heading;
+        # an uploaded inline image goes above the body paragraph.
+        top_media = hero_html
+        early_media = ''
+        early_inline = inline_html
+        late_inline = ''
+    else:
+        top_media = ''
+        early_media = hero_html
+        early_inline = ''
+        late_inline = inline_html
+
+    header_height = '19px 34px 0' if layout == 'Image-first' else '25px 34px 0'
+    promo_label = ''
+    if layout == 'Image-first':
+        promo_label = (f'<p style="font-size:11px;font-weight:700;letter-spacing:2px;'
+                       f'color:{colors["accent"]};text-transform:uppercase;margin:0 0 16px;">'
+                       'VISUAL STORY</p>')
+    if layout == 'Promotional':
+        promo_label = (f'<p style="font-size:11px;font-weight:700;letter-spacing:2px;'
+                       f'color:{colors["accent"]};text-transform:uppercase;margin:0 0 16px;">'
+                       'FEATURED UPDATE</p>')
+        header_height = '31px 34px 0'
+
+    cta_html = ''
+    if cta_url and button_label:
+        cta_html = (
+            '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">'
+            f'<tr><td bgcolor="{colors["button"]}" style="background-color:{colors["button"]};border-radius:8px;">'
+            f'<a href="{safe_html(cta_url, quote=True)}" '
+            f'style="display:inline-block;padding:15px 26px;font-size:15px;font-weight:700;'
+            f'color:{colors["button_text"]};text-decoration:none;">{button_label}</a>'
+            '</td></tr></table>'
+        )
+    if layout == 'Promotional' and cta_html:
+        cta_html = (f'<div style="padding:17px;border-left:4px solid {colors["accent"]};'
+                    f'background-color:{colors["page"]};">' + cta_html + '</div>')
+
+    safe_unsub = safe_https_url(unsubscribe)
+    unsub_html = (
+        f'<a href="{safe_html(safe_unsub, quote=True)}" '
+        f'style="color:{colors["footer_text"]};text-decoration:underline;">Unsubscribe</a>'
+        if safe_unsub else 'To unsubscribe, reply to this email with UNSUBSCRIBE.'
     )
+    content = html_paragraphs(body)
+    if layout == 'Promotional':
+        content = (f'<div style="border-left:3px solid {colors["accent"]};padding-left:17px;">'
+                   + content + '</div>')
+    if layout == 'Image-first' and early_inline:
+        content = early_inline + content
+
     return f"""<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light only">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{safe_html(subject)}</title></head>
-<body style="margin:0;padding:0;background-color:#F6F7F5;">
+<body style="margin:0;padding:0;background-color:{colors['page']};">
 <div style="display:none!important;max-height:0;overflow:hidden;opacity:0;color:transparent;">{preheader}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F6F7F5;width:100%;border-collapse:collapse;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{colors['page']};width:100%;border-collapse:collapse;">
 <tr><td align="center" style="padding:24px 10px 34px;">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background-color:#FFFFFF;border:1px solid #DFE7E3;border-collapse:separate;border-radius:16px;overflow:hidden;">
-<tr><td bgcolor="#F0EFFA" style="background-color:#F0EFFA;padding:29px 34px 0;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background-color:#FFFFFF;border:1px solid {colors['border']};border-collapse:separate;border-radius:16px;overflow:hidden;">
+{top_media}
+<tr><td bgcolor="{colors['header']}" style="background-color:{colors['header']};padding:{header_height};">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-<td style="font:700 15px Arial,Helvetica,sans-serif;color:#3F4A58;letter-spacing:1px;">✦ &nbsp;{brand}</td>
-<td align="right" style="font:700 10px Arial,Helvetica,sans-serif;color:#796DC0;letter-spacing:1.5px;">A NOTE FOR YOU</td>
+<td style="font:700 15px Arial,Helvetica,sans-serif;color:{colors['header_text']};letter-spacing:1px;">✦ &nbsp;{brand}</td>
+<td align="right" style="font:700 10px Arial,Helvetica,sans-serif;color:{colors['header_text']};letter-spacing:1px;">A NOTE FOR YOU</td>
 </tr></table>
-<h1 style="font:700 30px/1.28 Arial,Helvetica,sans-serif;letter-spacing:-.6px;color:#2C3549;margin:24px 0 0;">{title}</h1>
+<h1 style="font:700 30px/1.28 Arial,Helvetica,sans-serif;letter-spacing:-.6px;color:{colors['header_text']};margin:24px 0 0;">{title}</h1>
 </td></tr>
 <tr><td bgcolor="#FFFFFF" style="padding:0;margin:0;line-height:0;font-size:0;">
-<img src="{header_src}" width="640" alt="" style="width:100%;max-width:640px;display:block;height:auto;border:0;">
-</td></tr>
-{hero_html}
+<img src="{header_src}" width="640" alt="" style="width:100%;max-width:640px;display:block;height:auto;border:0;"></td></tr>
+{early_media}
 <tr><td bgcolor="#FFFFFF" style="padding:24px 34px 35px;font-family:Arial,Helvetica,sans-serif;">
-<p style="margin:0 0 24px;color:#796DC0;font-size:12px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;">A little something from our team</p>
-{html_paragraphs(body)}
+{promo_label}
+<p style="margin:0 0 24px;color:{colors['accent']};font-size:12px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;">A little something from our team</p>
+<div style="color:{colors['ink']};">{content}</div>
+{late_inline}
 {cta_html}
 </td></tr>
 <tr><td bgcolor="#FFFFFF" style="padding:0;line-height:0;font-size:0;">
-<img src="{footer_src}" width="640" alt="" style="width:100%;max-width:640px;display:block;height:auto;border:0;">
-</td></tr>
-<tr><td bgcolor="#E8F4EE" style="background-color:#E8F4EE;padding:4px 34px 30px;font-family:Arial,Helvetica,sans-serif;">
+<img src="{footer_src}" width="640" alt="" style="width:100%;max-width:640px;display:block;height:auto;border:0;"></td></tr>
+<tr><td bgcolor="{colors['footer']}" style="background-color:{colors['footer']};padding:4px 34px 30px;font-family:Arial,Helvetica,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td style="font:700 15px Arial,Helvetica,sans-serif;color:#34483F;">✦ &nbsp;{brand}</td>
-<td align="right" style="font:12px Arial,Helvetica,sans-serif;color:#517A6B;">Thank you for reading</td>
+<td style="font:700 15px Arial,Helvetica,sans-serif;color:{colors['footer_text']};">✦ &nbsp;{brand}</td>
+<td align="right" style="font:12px Arial,Helvetica,sans-serif;color:{colors['footer_text']};">Thank you for reading</td>
 </tr></table>
-<p style="font:13px/1.75 Arial,Helvetica,sans-serif;color:#5D6D66;margin:18px 0 12px;">{footer}</p>
-<p style="font:12px/1.65 Arial,Helvetica,sans-serif;color:#52685D;margin:0 0 12px;">{unsub_html}</p>
-<p style="font:11px Arial,Helvetica,sans-serif;color:#71877B;margin:0;">Made with care · {brand}</p>
-</td></tr>
-</table></td></tr></table></body></html>"""
+<p style="font:13px/1.75 Arial,Helvetica,sans-serif;color:{colors['footer_text']};margin:18px 0 12px;">{footer}</p>
+<p style="font:12px/1.65 Arial,Helvetica,sans-serif;color:{colors['footer_text']};margin:0 0 12px;">{unsub_html}</p>
+<p style="font:11px Arial,Helvetica,sans-serif;color:{colors['footer_text']};margin:14px 0 0;">Made with care · {brand}</p>
+</td></tr></table></td></tr></table></body></html>"""
 
 
-def compose_branded_message(sender,recipient,subject,body,reply_to='',unsubscribe='',design=None,sender_display_name=''):
-    """Preserve core.py MIME plain text, add safe HTML and inline wave images."""
-    opts={**DEFAULT_EMAIL_DESIGN,**(design or {})}
-    msg=compose_message(sender,recipient,subject,body,reply_to,unsubscribe)
-    # The From header can show a brand name while retaining the verified sender email.
-    # Header names are plain text; strip CR/LF to prevent header injection.
-    visible_name=(sender_display_name or '').replace('\r',' ').replace('\n',' ').strip()[:100]
+def compose_branded_message(sender,recipient,subject,body,reply_to='',unsubscribe='',design=None,sender_display_name='',attachments=None,inline_image=None):
+    """Preserve plain-text MIME fallback and add rendered HTML, CID art, and optional files."""
+    opts = {**DEFAULT_EMAIL_DESIGN, **(design or {})}
+    colors = resolve_email_colors(opts)
+    msg = compose_message(sender,recipient,subject,body,reply_to,unsubscribe)
+    visible_name = (sender_display_name or '').replace('\r',' ').replace('\n',' ').strip()[:100]
     if visible_name:
         msg.replace_header('From',formataddr((visible_name,sender)))
-    html_part=msg.get_body(preferencelist=('html',))
+    html_part = msg.get_body(preferencelist=('html',))
     if html_part is None:
         raise ValueError('Could not build the HTML alternative.')
-    html_part.set_content(render_branded_html(subject,body,opts,sender,unsubscribe,image_mode='cid'),subtype='html')
-    html_part.add_related(_wave_png('header',opts.get('header_pattern','Waves')),
+    html_part.set_content(render_branded_html(subject,body,opts,sender,unsubscribe,image_mode='cid',inline_image=inline_image),subtype='html')
+    html_part.add_related(_wave_png('header',opts.get('header_pattern','Waves'), colors),
         maintype='image',subtype='png',cid='<mailpilot-header-wave@local>',
         filename='mailpilot-header-wave.png',disposition='inline')
-    html_part.add_related(_wave_png('footer',opts.get('footer_pattern','Waves')),
+    html_part.add_related(_wave_png('footer',opts.get('footer_pattern','Waves'), colors),
         maintype='image',subtype='png',cid='<mailpilot-footer-wave@local>',
         filename='mailpilot-footer-wave.png',disposition='inline')
+    if inline_image:
+        mime_main,mime_sub=inline_image['mime'].split('/',1)
+        html_part.add_related(inline_image['data'],maintype=mime_main,subtype=mime_sub,
+            cid='<mailpilot-uploaded-image@local>',
+            filename=inline_image['filename'],disposition='inline')
+    for item in attachments or []:
+        mime_main,mime_sub=item['mime'].split('/',1)
+        msg.add_attachment(item['data'],maintype=mime_main,subtype=mime_sub,
+            filename=item['filename'])
     return msg
+
+
+# Supported uploads are small and in-memory for the current SMTP page only.
+# They are not stored in Supabase, Streamlit Secrets, or the repository.
+EMAIL_ATTACHMENT_EXTENSIONS = {
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.csv', '.txt', '.png', '.jpg', '.jpeg', '.gif', '.webp'
+}
+MAX_EMAIL_ATTACHMENT_FILES = 3
+MAX_EMAIL_FILE_BYTES = 5 * 1024 * 1024  # each attached file
+MAX_EMAIL_INLINE_BYTES = 3 * 1024 * 1024
+MAX_EMAIL_TOTAL_BYTES = 8 * 1024 * 1024  # all attachments + inline image
+
+
+def prepare_email_uploads(uploaded_files, uploaded_inline_image):
+    """Validate optional user uploads and return ready-to-attach MIME parts."""
+    uploaded_files = list(uploaded_files or [])
+    if len(uploaded_files) > MAX_EMAIL_ATTACHMENT_FILES:
+        raise ValueError('Attach no more than 3 files per email.')
+    attachments = []
+    total_size = 0
+    for upload in uploaded_files:
+        filename = Path(upload.name).name.replace('\r', '_').replace('\n', '_')
+        filename = filename.replace('\x00', '_')[:120]
+        extension = Path(filename).suffix.lower()
+        if not filename or extension not in EMAIL_ATTACHMENT_EXTENSIONS:
+            raise ValueError('Unsupported file type. Use PDF, Office documents, text, CSV, or images.')
+        contents = upload.getvalue()
+        if not contents:
+            raise ValueError(f'{filename} is empty.')
+        if len(contents) > MAX_EMAIL_FILE_BYTES:
+            raise ValueError(f'{filename} exceeds the 5 MB per-file limit.')
+        total_size += len(contents)
+        mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+        attachments.append({'filename': filename, 'data': contents, 'mime': mimetype})
+
+    inline_image = None
+    if uploaded_inline_image is not None:
+        filename = Path(uploaded_inline_image.name).name.replace('\r', '_').replace('\n', '_')
+        filename = filename.replace('\x00', '_')[:120]
+        if Path(filename).suffix.lower() not in ('.png', '.jpg', '.jpeg', '.webp'):
+            raise ValueError('The in-email image must be PNG, JPG or WEBP.')
+        contents = uploaded_inline_image.getvalue()
+        if not contents or len(contents) > MAX_EMAIL_INLINE_BYTES:
+            raise ValueError('The in-email image must be nonempty and no larger than 3 MB.')
+        # Validate the picture and convert to PNG/JPEG so it works across
+        # common email clients (which may not render WEBP inline).
+        try:
+            with Image.open(BytesIO(contents)) as img:
+                if img.format not in ('PNG', 'JPEG', 'WEBP'):
+                    raise ValueError('The uploaded image is not PNG, JPG or WEBP.')
+                if img.width * img.height > 12_000_000:
+                    raise ValueError('The in-email image is too large (max 12 megapixels).')
+                img.load()
+                image_format = img.format
+                if image_format == 'WEBP':
+                    out = BytesIO()
+                    img.convert('RGB').save(out, format='PNG', optimize=True)
+                    contents = out.getvalue()
+                    filename = Path(filename).stem + '.png'
+                    mime = 'image/png'
+                else:
+                    mime = 'image/png' if image_format == 'PNG' else 'image/jpeg'
+        except (OSError, Image.DecompressionBombError) as exc:
+            raise ValueError('Could not read the uploaded image. Use a valid PNG/JPG/WEBP.') from exc
+        if len(contents) > MAX_EMAIL_INLINE_BYTES:
+            raise ValueError('Converted in-email image exceeds the 3 MB limit.')
+        total_size += len(contents)
+        inline_image = {'filename': filename, 'data': contents, 'mime': mime}
+
+    if total_size > MAX_EMAIL_TOTAL_BYTES:
+        raise ValueError('Combined uploads must be 8 MB or less per email.')
+    return attachments, inline_image
 
 
 def personalized_design(design,contact):
@@ -993,54 +1205,107 @@ elif page=='Campaign Studio':
                 if st.button('Confirm delete campaign'):
                     store.delete_campaign(cid);st.rerun()
     with designer:
-        st.markdown('**Premium email designer — wavy header and footer, without a color palette.**')
-        st.caption('No color palette: one refined Sage & Lilac style. Choose wavy header and footer patterns. The waves are embedded into sent emails, not hosted elsewhere. Optional banner pictures need a public HTTPS URL.')
+        st.markdown('**Email Theme Gallery — six designs, three layouts and optional custom colors**')
+        st.caption('Pick a ready-made theme, customize its colors if you like, and see the result immediately. Save each design to its own campaign.')
         design_cid = campaign_select('Choose a campaign to design',key='html_design_campaign')
         if design_cid is not None:
             design_campaign = next(c for c in campaigns if c['id'] == design_cid)
             current_design = get_email_design(design_cid)
-            with st.form(f'email_design_form_{design_cid}'):
-                pat_a,pat_b=st.columns(2)
-                header_pattern=pat_a.selectbox('Header pattern',PATTERN_OPTIONS,
-                    index=PATTERN_OPTIONS.index(current_design['header_pattern']) if current_design['header_pattern'] in PATTERN_OPTIONS else 0)
-                footer_pattern=pat_b.selectbox('Footer pattern',PATTERN_OPTIONS,
-                    index=PATTERN_OPTIONS.index(current_design['footer_pattern']) if current_design['footer_pattern'] in PATTERN_OPTIONS else 0)
-                col1,col2 = st.columns(2)
-                brand = col1.text_input('Brand name in email header',value=current_design['brand'],max_chars=80)
-                heading = col2.text_input('Main header headline (optional)',value=current_design['heading'],
-                                          placeholder='Defaults to your campaign subject',max_chars=160)
-                preheader = st.text_input('Preview line shown by some inboxes',value=current_design['preheader'],max_chars=180)
-                hero_url = st.text_input('Optional banner picture URL (HTTPS only)',value=current_design['hero_url'],
-                                         placeholder='https://yourdomain.com/banner.jpg')
-                btn1,btn2 = st.columns(2)
-                button_label = btn1.text_input('Optional button label',value=current_design['button_label'],placeholder='Visit our website',max_chars=80)
-                button_url = btn2.text_input('Optional button link (HTTPS only)',value=current_design['button_url'],placeholder='https://example.com')
-                footer = st.text_area('Footer description',value=current_design['footer'],height=100,max_chars=500)
-                save_design = st.form_submit_button('Save HTML email design',type='primary')
-            draft_design = dict(brand=brand,heading=heading,preheader=preheader,
-                                hero_url=hero_url,button_label=button_label,button_url=button_url,
-                                footer=footer,header_pattern=header_pattern,footer_pattern=footer_pattern)
-            if save_design:
-                bad_urls = [name for name, value in (('banner picture', hero_url),('button link', button_url))
-                            if value and not safe_https_url(value)]
-                if bad_urls:
-                    st.error('Please use a valid public HTTPS URL for: '+', '.join(bad_urls))
-                else:
-                    try:
-                        save_email_design(design_cid,draft_design)
-                        st.success('Design saved in your account (Supabase for members; temporary storage for guests).')
-                    except OSError as exc:
-                        st.error(f'Could not save design: {exc}')
-            example={'name':'Alex','email':'alex@example.com','company':'Example Co'}
-            st.subheader('Inbox-style preview')
-            st.caption('This is a visual preview. Email clients may display HTML differently. Live SMTP uses this saved design.')
-            sample_subject=personalize(design_campaign['subject'],example)
-            sample_body=personalize(design_campaign['body'],example)
-            sample_design=personalized_design(draft_design,example)
-            sample_html=render_branded_html(sample_subject,sample_body,sample_design,unsubscribe='')
-            components.html(sample_html,height=740,scrolling=True)
-            st.download_button('Download preview as HTML',sample_html.encode('utf-8'),
-                               file_name=f'campaign-{design_cid}-email-preview.html',mime='text/html')
+            gallery_cols = st.columns(3)
+            for ix, (theme_label, theme_colors) in enumerate(EMAIL_THEMES.items()):
+                with gallery_cols[ix % 3]:
+                    st.markdown(
+                        f'<div style="border:1px solid {theme_colors["border"]};border-radius:12px;overflow:hidden;margin:0 0 10px;">'
+                        f'<div style="background:{theme_colors["header"]};padding:10px 12px;color:{theme_colors["header_text"]};font-weight:700;font-size:12px;">{safe_html(theme_label)}</div>'
+                        f'<div style="display:flex;background:{theme_colors["page"]};padding:9px 12px;gap:6px;">'
+                        f'<span style="display:inline-block;width:30px;height:14px;border-radius:4px;background:{theme_colors["accent"]};"></span>'
+                        f'<span style="display:inline-block;width:30px;height:14px;border-radius:4px;background:{theme_colors["button"]};"></span>'
+                        f'<span style="display:inline-block;width:30px;height:14px;border-radius:4px;background:{theme_colors["footer"]};"></span>'
+                        '</div></div>', unsafe_allow_html=True
+                    )
+
+            theme_names = list(EMAIL_THEMES)
+            selected_theme = st.selectbox('Choose email theme', theme_names,
+                index=theme_names.index(current_design['theme']), key=f'email_theme_{design_cid}')
+            selected_layout = st.radio('Email layout', EMAIL_LAYOUTS, horizontal=True,
+                index=EMAIL_LAYOUTS.index(current_design['layout']), key=f'email_layout_{design_cid}')
+            st.caption('Classic: balanced newsletter · Image-first: visuals before text · Promotional: featured offer and prominent action')
+            use_custom = st.checkbox('Customize theme colors',
+                value=str(current_design.get('custom_colors', 'false')).lower() == 'true',
+                key=f'email_use_custom_{design_cid}')
+            selected_palette = EMAIL_THEMES[selected_theme]
+            custom_header = current_design.get('custom_header', selected_palette['header'])
+            custom_accent = current_design.get('custom_accent', selected_palette['accent'])
+            custom_button = current_design.get('custom_button', selected_palette['button'])
+            custom_footer = current_design.get('custom_footer', selected_palette['footer'])
+            if use_custom:
+                color_col1, color_col2, color_col3, color_col4 = st.columns(4)
+                custom_header = color_col1.color_picker('Header', value=custom_header,
+                    key=f'email_header_color_{design_cid}')
+                custom_accent = color_col2.color_picker('Accent', value=custom_accent,
+                    key=f'email_accent_color_{design_cid}')
+                custom_button = color_col3.color_picker('Button', value=custom_button,
+                    key=f'email_button_color_{design_cid}')
+                custom_footer = color_col4.color_picker('Footer', value=custom_footer,
+                    key=f'email_footer_color_{design_cid}')
+            st.markdown('**Header, links and finishing touches**')
+            pat_a, pat_b = st.columns(2)
+            header_pattern = pat_a.selectbox('Header pattern', PATTERN_OPTIONS,
+                index=PATTERN_OPTIONS.index(current_design['header_pattern']),
+                key=f'email_header_pattern_{design_cid}')
+            footer_pattern = pat_b.selectbox('Footer pattern', PATTERN_OPTIONS,
+                index=PATTERN_OPTIONS.index(current_design['footer_pattern']),
+                key=f'email_footer_pattern_{design_cid}')
+            a, b = st.columns(2)
+            brand = a.text_input('Brand name', value=current_design['brand'], max_chars=80,
+                key=f'email_brand_{design_cid}')
+            heading = b.text_input('Main email heading (optional)', value=current_design['heading'], max_chars=160,
+                key=f'email_heading_{design_cid}')
+            preheader = st.text_input('Inbox preview line', value=current_design['preheader'], max_chars=180,
+                key=f'email_preheader_{design_cid}')
+            hero_url = st.text_input('Banner picture URL (HTTPS, optional)', value=current_design['hero_url'],
+                key=f'email_hero_{design_cid}')
+            a, b = st.columns(2)
+            button_label = a.text_input('Action button label (optional)', value=current_design['button_label'], max_chars=80,
+                key=f'email_button_label_{design_cid}')
+            button_url = b.text_input('Action button link (HTTPS, optional)', value=current_design['button_url'],
+                key=f'email_button_url_{design_cid}')
+            footer = st.text_area('Footer description', value=current_design['footer'], height=95, max_chars=500,
+                key=f'email_footer_{design_cid}')
+
+            draft_design = {
+                'theme': selected_theme, 'layout': selected_layout,
+                'custom_colors': 'true' if use_custom else 'false',
+                'custom_header': custom_header, 'custom_accent': custom_accent,
+                'custom_button': custom_button, 'custom_footer': custom_footer,
+                'brand': brand, 'heading': heading, 'preheader': preheader,
+                'hero_url': hero_url, 'button_label': button_label, 'button_url': button_url,
+                'footer': footer, 'header_pattern': header_pattern, 'footer_pattern': footer_pattern,
+            }
+            invalid_urls = [label for label, val in (('banner URL', hero_url), ('button URL', button_url))
+                            if val and not safe_https_url(val)]
+            if invalid_urls:
+                st.warning('Use public HTTPS links for: ' + ', '.join(invalid_urls))
+            if st.button('Save selected theme and design to this campaign', type='primary',
+                         key=f'email_save_theme_{design_cid}', disabled=bool(invalid_urls)):
+                try:
+                    save_email_design(design_cid, draft_design)
+                    st.success('Theme, layout and colors saved to this campaign in your account.')
+                except (ValueError, OSError, SupabaseError) as exc:
+                    st.error('Could not save the design: ' + str(exc))
+
+            st.subheader('Live inbox-style preview')
+            st.caption('This preview updates as you make selections; live email sends use the last saved version of this campaign.')
+            example = {'name': 'Alex', 'email': 'alex@example.com', 'company': 'Example Co'}
+            sample_subject = personalize(design_campaign['subject'], example)
+            sample_body = personalize(design_campaign['body'], example)
+            sample_design = personalized_design(draft_design, example)
+            sample_html = render_branded_html(sample_subject, sample_body, sample_design, unsubscribe='')
+            components.html(sample_html, height=760, scrolling=True)
+            st.download_button('Download preview as HTML', sample_html.encode('utf-8'),
+                file_name=f'campaign-{design_cid}-email-preview.html', mime='text/html',
+                key=f'email_download_{design_cid}')
+            st.info('To attach documents or insert a locally uploaded image, open Live SMTP before sending. Uploads are temporary and are not saved to Supabase.')
 
 elif page=='Daily Automation':
     st.title('Daily Automation Simulator')
@@ -1170,13 +1435,51 @@ elif page=='Live SMTP':
         if not _identity.get('email_verified', False):
             st.warning('Verify your MailPilot Pro account email before live sending.')
             st.stop()
+        st.subheader('Add files or images (optional)')
+        st.caption(
+            'Uploads below are included in both your test email and each live campaign email. '
+            'They are kept only for this active page/session, not saved to Supabase. '
+            'Re-upload after logging out or changing pages.'
+        )
+        uploaded_attachments = st.file_uploader(
+            '📎 Attach documents or images',
+            type=sorted(ext.lstrip('.') for ext in EMAIL_ATTACHMENT_EXTENSIONS),
+            accept_multiple_files=True,
+            key='smtp_attached_documents',
+            help='Up to 3 files, max 5 MB each and 8 MB combined.'
+        )
+        uploaded_inline_image = st.file_uploader(
+            '🖼 Insert a picture inside the email body (optional)',
+            type=['png', 'jpg', 'jpeg', 'webp'],
+            key='smtp_embedded_picture',
+            help='PNG, JPEG or WEBP, max 3 MB. The image appears below the email text.'
+        )
+        attachments_ok = True
+        email_attachments = []
+        email_inline_image = None
+        try:
+            email_attachments, email_inline_image = prepare_email_uploads(
+                uploaded_attachments, uploaded_inline_image
+            )
+        except ValueError as exc:
+            attachments_ok = False
+            st.error(str(exc))
+        if attachments_ok and (email_attachments or email_inline_image):
+            descriptions = [
+                f"{f['filename']} ({len(f['data']) / 1024:.0f} KB)"
+                for f in email_attachments
+            ]
+            if email_inline_image:
+                descriptions.append(f"Inline image: {email_inline_image['filename']}")
+            st.success('Selected for sending: ' + ', '.join(descriptions))
+
         st.subheader('2. Send a real test to your own address')
         st.caption('To prevent abuse, test messages go only to your verified From email. Maximum 3 test attempts per UTC day.')
         remaining_tests=max(0,3-store.smtp_tests_used())
         st.metric('Test emails remaining (UTC)',remaining_tests)
         test_cid=campaign_select('Optional campaign design for test',key='smtp_test_design')
         test_campaign=next((c for c in campaigns if c['id']==test_cid),None)
-        if st.button('Send Test Email',disabled=not ready or remaining_tests==0,key='send_own_test'):
+        if st.button('Send Test Email',disabled=not ready or remaining_tests==0 or not attachments_ok,key='send_own_test'):
             test_id=None
             try:
                 test_id=store.reserve_smtp_test(sender.strip())
@@ -1190,7 +1493,8 @@ elif page=='Live SMTP':
                     body='Your own SMTP account is connected. This is a real test from MailPilot Pro.'
                     design=DEFAULT_EMAIL_DESIGN
                 msg=compose_branded_message(sender.strip(),sender.strip(),subject,body,
-                    reply_to.strip(),unsubscribe.strip(),design,display_name.strip())
+                    reply_to.strip(),unsubscribe.strip(),design,display_name.strip(),
+                    attachments=email_attachments,inline_image=email_inline_image)
                 with st.spinner('Sending your test email...'):
                     send_via_user_smtp(provider,username.strip(),password,msg)
                 store.finish_smtp_test(test_id,True)
@@ -1217,11 +1521,22 @@ elif page=='Live SMTP':
                 person=chosen[0]
                 st.markdown('**Personalized subject:** '+personalize(campaign['subject'],person))
                 st.text_area('Email preview (first recipient)',personalize(campaign['body'],person),height=150,disabled=True)
+                with st.expander('Preview themed HTML email and uploaded image', expanded=False):
+                    preview_design = personalized_design(get_email_design(send_cid), person)
+                    preview_html = render_branded_html(
+                        personalize(campaign['subject'], person),
+                        personalize(campaign['body'], person),
+                        preview_design, sender.strip(), unsubscribe.strip(),
+                        inline_image=email_inline_image
+                    )
+                    components.html(preview_html, height=680, scrolling=True)
+                    if email_attachments:
+                        st.caption('Attached files: ' + ', '.join(item['filename'] for item in email_attachments))
         remaining=max(0,MAX_DAILY-store.live_used())
         st.metric('Live campaign attempts remaining (UTC)',remaining)
         consent=st.checkbox('Each selected person explicitly opted in, and I can process unsubscribe requests.',key='smtp_consent')
         confirmation=st.text_input('Type SEND to confirm real campaign sending',key='smtp_confirmation')
-        can_send=bool(ready and send_cid is not None and chosen and remaining>0 and consent and confirmation=='SEND')
+        can_send=bool(ready and attachments_ok and send_cid is not None and chosen and remaining>0 and consent and confirmation=='SEND')
         if st.button('Send Campaign',type='primary',disabled=not can_send,key='smtp_send_campaign'):
             successes=failures=0
             progress=st.progress(0,text=f'Sending 0 of {min(len(chosen),remaining)}')
@@ -1250,7 +1565,7 @@ elif page=='Live SMTP':
                     message=compose_branded_message(sender.strip(),person['email'],
                         personalize(campaign['subject'],person),personalize(campaign['body'],person),
                         reply_to.strip(),unsubscribe.strip(),personalized_design(get_email_design(send_cid),person),
-                        display_name.strip())
+                        display_name.strip(),attachments=email_attachments,inline_image=email_inline_image)
                     send_via_user_smtp(provider,username.strip(),password,message)
                     store.finish_live(send_cid,person['email'],True)
                     successes+=1
