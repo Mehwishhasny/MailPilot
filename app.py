@@ -858,7 +858,7 @@ def render_branded_html(subject, body, design, sender='', unsubscribe='', image_
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
+<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light">
 <title>{safe_html(subject)}</title></head>
 <body style="margin:0;padding:0;background-color:{colors['page']};">
 <div style="display:none!important;max-height:0;overflow:hidden;opacity:0;color:transparent;">{preheader}</div>
