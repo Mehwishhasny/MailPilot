@@ -300,6 +300,20 @@ p,label{overflow-wrap:break-word}
   }
 }
 
+/* Hide Streamlit branding and viewer badges */
+#MainMenu,
+footer,
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stAppDeployButton"],
+.viewerBadge_container__1QSob,
+.viewerBadge_link__1S137,
+[class*="viewerBadge"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+
 </style>''',unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
